@@ -1,0 +1,19 @@
+{
+  "compatibleVersion": 3,
+  "bundleVersion": 1,
+  "icon": "icon.png",
+  "commands": [
+    {
+      "name": "Layout Page",
+      "identifier": "{{ slug }}.my-command-identifier",
+      "script": "./my-command.js",
+      "shortcut": "option + cmd + l"
+    }
+  ],
+  "menu": {
+    "title": "cs-layout",
+    "items": [
+      "{{ slug }}.my-command-identifier"
+    ]
+  }
+}
