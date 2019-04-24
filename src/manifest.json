@@ -4,16 +4,24 @@
   "icon": "icon.png",
   "commands": [
     {
-      "name": "Layout Page",
+      "name": "Layout Page 2",
       "identifier": "{{ slug }}.my-command-identifier",
       "script": "./my-command.js",
       "shortcut": "option + cmd + l"
+    },
+    {
+      "name": "Layout Page",
+      "identifier": "{{ slug }}.my-command-identifier-2",
+      "script": "./my-command-2.js",
+      "shortcut": "shift + option + cmd + l"
     }
+    
   ],
   "menu": {
     "title": "cs-layout",
     "items": [
-      "{{ slug }}.my-command-identifier"
+      "{{ slug }}.my-command-identifier",
+      "{{ slug }}.my-command-identifier-2"
     ]
   }
 }

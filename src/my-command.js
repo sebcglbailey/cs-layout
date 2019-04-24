@@ -3,13 +3,12 @@ import Sketch from 'sketch'
 
 const Document = require('sketch/dom').Document
 
-let bottom = 0, margin = 0, offset = 0;
+const capHeightRatio = 0.713984375
+const capOffsetRatio = 0.5710278832
+const baselineOffsetRatio = 0.4289721168
 
-let layerIsText = false;
-
-const capHeightRatio = 0.7140625
-const capOffsetRatio = 0.5686113394
-const baselineOffsetRatio = 0.4315529992
+let lastLayerInGroupIsText = false
+let groupOffset = 0
 
 // Run the plugin
 export default (context) => {
@@ -30,13 +29,9 @@ export default (context) => {
   layers = artboard.layers
 
   iterateLayers(layers)
-
-  artboard.adjustToFit()
   
 }
 
-
-// iterate over given array of layers
 const iterateLayers = (layers) => {
 
   layers.reverse()
@@ -44,32 +39,30 @@ const iterateLayers = (layers) => {
   let i = 0
 
   while (i < layers.length) {
-
+    
     let layer = layers[i]
+    
+    if (i == layers.length-1 && checkIfText(layer)) {
+      lastLayerInGroupIsText = true
+      groupOffset = getBaselineOffset(layer)
+    }
 
-    setMargin(layer)
-    checkIfAbsolute(layer)
     place(layer)
-    
+
+    if (i == layers.length-1 && !checkIfText(layer)) {
+      lastLayerInGroupIsText = false
+      groupOffset = 0
+    }
+
     let isGroup = checkIfGroup(layer)
-    
+
     if (isGroup) {
-      setDefaults()
-      let groupLayers = layer.layers
-      iterateLayers(groupLayers)
+      iterateLayers(layer.layers)
       layer.adjustToFit()
-    }
-
-    if (checkIfText(layer)) {
-      layerIsText = true
-    } else if (checkIfGroup(layer)) {
-      layerIsText = layerIsText
     } else {
-      layerIsText = false
+
     }
 
-    setBottom(layer, layerIsText)
-    
     i++
 
   }
@@ -79,62 +72,13 @@ const iterateLayers = (layers) => {
 }
 
 const roundToNearest = (value, near) => {
-  return value + (near - (value % near))
-}
-
-// setting the margin value
-const setMargin = (layer) => {
-  margin = getMargin(layer.name)
-}
-
-const getMargin = (name) => {
-  let marginString = name.split("[margin:")[1]
-  marginString = marginString ? marginString.split("]")[0] : null
-  return Number(marginString) ? Number(marginString) : 0
-}
-
-// setting the bottom value
-const setBottom = (layer, isText) => {
-  bottom = layer.frame.y + layer.frame.height
-
-  if (checkIfText(layer)) {
-    let {baselineOffset, diff} = getBaselineOffset(layer)
-    offset = baselineOffset
-  }
-
-  if (isText) {
-    bottom -= offset
+  if (value % near < near / 2) {
+    return value + (near - (value % near)) - near
   } else {
-    offset = 0
+    return value + (near - (value % near))
   }
 }
 
-const getBaselineOffset = (layer) => {
-  let fontSize = layer.style.fontSize
-  let capHeight = fontSize * capHeightRatio
-  let lineHeight = layer.style.lineHeight
-  let diff = lineHeight - capHeight
-  let baselineOffset = baselineOffsetRatio * diff
-  baselineOffset = Math.ceil(baselineOffset)
-
-  return {baselineOffset: baselineOffset, diff: diff}
-}
-
-// place the layer based on current position and margin
-const place = (layer) => {
-  let position = bottom + margin
-
-  if (layer.type == "Text") {
-    let {baselineOffset, diff} = getBaselineOffset(layer)
-    position += baselineOffset
-    diff = roundToNearest(diff, 4) - 4
-    position -= diff
-  }
-
-  layer.frame.y = position
-}
-
-// check if the layer is a group
 const checkIfGroup = (layer) => {
   return layer.type == "Group"
 }
@@ -143,15 +87,110 @@ const checkIfText = (layer) => {
   return layer.type == "Text"
 }
 
-// reset the position and margin to default (0)
-const setDefaults = () => {
-  bottom = 0;
-  margin = 0;
+const place = (layer) => {
+
+  let margin = getMargin(layer)
+  let bottom = getBottom(layer)
+
+  let position = bottom + margin
+
+  if (checkIfText(layer)) {
+    position -= roundToNearest(getCaplineDiff(layer), 1)
+    
+    let bottomLayer = position + layer.frame.height
+    let baselineOffset = getBaselineOffset(layer)
+    let baselinePos = bottomLayer - baselineOffset
+    let nearestBaseline = roundToNearest(baselinePos, 4)
+    let baselineDiff = baselinePos - nearestBaseline
+
+    position -= baselineDiff
+
+  }
+
+  layer.frame.y = position
+
 }
 
-// checks to see if the layer has is stuck to the top of its group
-const checkIfAbsolute = (layer) => {
-  if (layer.name && layer.name.includes("[absolute]")) {
-    bottom = 0;
+const getMargin = (layer) => {
+
+  let layerName = layer.name
+  let marginString = layerName && layerName.split("[margin:") ? layerName.split("[margin:")[1] : undefined
+  marginString = marginString && marginString.split("]") ? marginString.split("]")[0] : undefined
+  return marginString ? Number(marginString) : 0
+
+}
+
+const getBottom = (layer) => {
+
+  let index = layer.index
+  let bottom = 0
+
+  if (index > 0) {
+    let prevLayer = layer.parent.layers[index-1]
+    bottom = prevLayer.frame.y + prevLayer.frame.height
+    bottom -= getBaselineOffset(prevLayer)
+    
+    if (prevLayer.type == "Group") {
+      bottom -= groupOffset
+    }
+
+  }
+
+
+  return checkIfTop(layer) ? 0 : bottom
+
+}
+
+const getBaselineOffset = (layer) => {
+
+  if (checkIfText(layer)) {
+
+    let diff = getCapHeightDiff(layer)
+    let baselineOffset = roundToNearest(diff * baselineOffsetRatio, 1)
+
+    // Custom fixes
+    if (layer.style.fontSize * 1.5 == layer.style.lineHeight) {
+      baselineOffset += 1
+    } else if (layer.style.fontSize == 24 && layer.style.lineHeight == 32) {
+      baselineOffset += 1
+    }
+
+    return baselineOffset
+
+  } else {
+    return 0
+  }
+
+}
+
+const getCapHeight = (layer) => {
+
+  let fontSize = layer.style.fontSize
+  let capHeight = fontSize * capHeightRatio
+  return capHeight
+
+}
+
+const getCapHeightDiff = (layer) => {
+
+  let lineHeight = layer.style.lineHeight
+  let capHeight = getCapHeight(layer)
+  let diff = lineHeight - capHeight
+
+  return diff
+
+}
+
+const getCaplineDiff = (layer) => {
+  
+  let diff = getCapHeightDiff(layer)
+  let caplineDiff = diff * capOffsetRatio
+  return caplineDiff
+
+}
+
+const checkIfTop = (layer) => {
+  if (layer.name && layer.name.includes("[top]")) {
+    return true
   }
 }
