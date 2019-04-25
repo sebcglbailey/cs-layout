@@ -8,7 +8,7 @@
   "skpm": {
     "name": "cs-layout",
     "manifest": "src/manifest.json",
-    "main": "{{ slug }}.sketchplugin",
+    "main": "cs-layout.sketchplugin",
     "assets": [
       "assets/**/*"
     ],
