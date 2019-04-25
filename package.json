@@ -1,7 +1,7 @@
 {
   "name": "cs-layout",
   "description": "Layout your artboards based on margins set in your layer names. Takes into account the capline and baseline offset for AktivGrotesk too.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "engines": {
     "sketch": ">=49.0"
   },
