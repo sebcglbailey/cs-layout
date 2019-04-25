@@ -1,6 +1,6 @@
 {
   "name": "cs-layout",
-  "description": "",
+  "description": "Layout your artboards based on margins set in your layer names. Takes into account the capline and baseline offset for AktivGrotesk too.",
   "version": "0.1.0",
   "engines": {
     "sketch": ">=49.0"
@@ -23,5 +23,6 @@
   "devDependencies": {
     "@skpm/builder": "^0.5.11"
   },
-  "author": "Seb Bailey <sebastian@clearscore.com>"
+  "author": "Seb Bailey <sebastian@clearscore.com>",
+  "repository": "https://github.com/sebcglbailey/cs-layout"
 }
