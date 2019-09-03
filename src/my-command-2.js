@@ -1,15 +1,13 @@
 import Sketch from 'sketch'
-// documentation: https://developer.sketchapp.com/reference/api/
 
-const Document = require('sketch/dom').Document
+let bottom = 0, margin = 0;
 
-let bottom = 0, margin = 0, offset = 0;
+let lastLayerIsText = false;
+let baselineOffset = 0;
 
-let layerIsText = false;
-
-const capHeightRatio = 0.7140625
-const capOffsetRatio = 0.5686113394
-const baselineOffsetRatio = 0.4315529992
+const capHeightRatio = 0.7
+const baselineOffsetRatio = 0.17
+const capHeightOffsetRatio = 0.13
 
 // Run the plugin
 export default (context) => {
@@ -31,7 +29,7 @@ export default (context) => {
   
   iterateLayers(layers)
 
-  artboard.adjustToFit()
+  // artboard.adjustToFit()
   
 }
 
@@ -61,14 +59,14 @@ const iterateLayers = (layers) => {
     }
 
     if (checkIfText(layer)) {
-      layerIsText = true
+      lastLayerIsText = true
     } else if (checkIfGroup(layer)) {
-      layerIsText = layerIsText
+      lastLayerIsText = lastLayerIsText
     } else {
-      layerIsText = false
+      lastLayerIsText = false
     }
 
-    setBottom(layer, layerIsText)
+    setBottom(layer, lastLayerIsText)
     
     i++
 
@@ -99,43 +97,71 @@ const getMargin = (name) => {
 
 // setting the bottom value
 const setBottom = (layer, isText) => {
+
   bottom = layer.frame.y + layer.frame.height
 
   if (checkIfText(layer)) {
-    let {baselineOffset, diff} = getBaselineOffset(layer)
-    offset = roundToNearest(baselineOffset, 4)
-  }
-
-  if (isText) {
-    bottom -= offset
+    let capHeightOffset = getCapHeightOffset(layer)
+    let fontSize = layer.style.fontSize
+    let capHeight = fontSize * capHeightRatio
+    let baseline = capHeightOffset + capHeight
+    baselineOffset = layer.style.lineHeight - Math.round(baseline)
+  } else if (isText) {
+    baselineOffset = baselineOffset
   } else {
-    offset = 0
+    bottom = layer.frame.y + layer.frame.height
+    baselineOffset = 0;
   }
+
 }
 
-const getBaselineOffset = (layer) => {
+const getCapHeightOffset = (layer) => {
+  let offset;
+
   let fontSize = layer.style.fontSize
-  let capHeight = fontSize * capHeightRatio
   let lineHeight = layer.style.lineHeight
-  let diff = lineHeight - capHeight
-  let baselineOffset = baselineOffsetRatio * diff
-  baselineOffset = baselineOffset
 
-  return {baselineOffset: baselineOffset, diff: diff}
+  let diff = lineHeight - fontSize
+  if (diff%2 == 0) {
+    offset = diff/2
+  } else {
+    offset = (diff+1)/2
+  }
+
+  offset += fontSize * capHeightOffsetRatio
+
+  return offset
+
 }
+
 
 // place the layer based on current position and margin
 const place = (layer) => {
   let position = bottom + margin
 
   if (layer.type == "Text") {
-    let {baselineOffset, diff} = getBaselineOffset(layer)
-    position += roundToNearest(baselineOffset, 4)
-    diff = roundToNearest(diff, 4)
-    position -= diff
+    position -= getCapHeightOffset(layer)
   }
 
-  layer.frame.y = position
+  layer.frame.y = Math.round(position) - baselineOffset
+
+  if (layer.type == "Text") {
+    let capHeightOffset = getCapHeightOffset(layer)
+    let fontSize = layer.style.fontSize
+    let capHeight = fontSize * capHeightRatio
+  
+    let position = layer.frame.y
+    let baseline = layer.frame.y + capHeightOffset + capHeight
+
+    if (baseline%4 < 1.2) {
+      layer.frame.y = Math.round(position - baseline%4)
+    } else {
+      layer.frame.y = Math.round(position + (4 - baseline%4))
+    }
+  }
+
+  baselineOffset = 0;
+
 }
 
 // check if the layer is a group
@@ -157,5 +183,6 @@ const setDefaults = () => {
 const checkIfTop = (layer) => {
   if (layer.name && layer.name.includes("[top]")) {
     bottom = 0;
+    baselineOffset = 0;
   }
 }
